@@ -3,10 +3,6 @@ from src import types, language
 from bidict import bidict
 
 
-class Fail:
-    pass
-
-
 def occur_check(var: language.Variable, val: Union[tuple, language.Term]) -> bool:
     """whether var occurs in val, because if so we can't unify"""
     if isinstance(val, tuple):
@@ -24,7 +20,7 @@ def unify_variable(var: language.Variable, val: Any, binding: bidict) -> types.B
     elif val in binding.inverse:
         return unify(var, binding.inverse[val], binding)
     elif occur_check(var, val):
-        return Fail
+        return language.FAIL
     else:
         binding[var] = val
         return binding
@@ -35,7 +31,7 @@ def unify_compound(x: language.Compound, y: language.Compound, binding: bidict) 
     Unifies two compounds, optionally subject to a binding, returning a binding
     """
     if not len(x.args) == len(y.args):
-        return Fail
+        return language.FAIL
     else:
         return unify(x.args, y.args, unify(x.op, y.op, binding))
 
@@ -59,7 +55,7 @@ def unify_tuple(x: tuple, y: tuple, binding: types.Binding) -> types.Binding:
     elif tail(y):
         return unify(y[0].to_var(), x, binding)
     elif bool(x) != bool(y):
-        return Fail
+        return language.FAIL
     else:
         return unify(x[1:], y[1:], unify(x[0], y[0], binding))
 
@@ -69,9 +65,9 @@ def unify(x: Any, y: Any, binding: Optional[types.Binding] = None) -> types.Bind
     Unifies two objects, optionally subject a binding, and returns the resulting binding
     """
 
-    # Fails get passed up the callstack
-    if binding == Fail:
-        return Fail
+    # language.FAILs get passed up the callstack
+    if binding == language.FAIL:
+        return language.FAIL
 
     # we might get weird user input formats
     binding = bidict(binding)
@@ -92,4 +88,4 @@ def unify(x: Any, y: Any, binding: Optional[types.Binding] = None) -> types.Bind
     elif isinstance(x, tuple) and isinstance(y, tuple):
         return unify_tuple(x, y, binding)
     else:
-        return Fail
+        return language.FAIL

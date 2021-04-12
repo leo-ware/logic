@@ -1,17 +1,18 @@
 import typing
-
-from src import types, language
-from src.unification import unify, Fail
+from src import types, language, unification
 
 
 class KnowledgeBase:
-    def __init__(self, known: typing.Iterable[language.Term]):
+    def __init__(self, known: typing.Iterable[typing.Union[language.Term, language.Rule]]):
         self.rules = set()
         for sentence in known:
             self.tell(sentence)
 
     def __repr__(self) -> str:
         return f"KnowledgeBase([\n    " + ",\n    ".join(map(str, self.rules)) + "\n])\n"
+
+    def __eq__(self, other):
+        return (type(self) == type(other)) and (self.rules == other.rules)
 
     def tell(self, sentence: typing.Union[language.Rule, language.Term]) -> None:
         """
@@ -34,7 +35,7 @@ class KnowledgeBase:
         for im_satisfied in self.fetch(query.head, binding):
             es = self.fetch(query.rest, im_satisfied)
             for everyone_satisfied in es:
-                if everyone_satisfied != Fail:
+                if everyone_satisfied != language.FAIL:
                     yield dict(everyone_satisfied)
 
     def _fetch_sentence(self, query: language.Term, binding: typing.Optional[types.Binding] = None) -> types.Bindings:
@@ -47,6 +48,6 @@ class KnowledgeBase:
             elif isinstance(have, language.And):
                 queue.extend(have)
             else:
-                u = unify(have, query, binding)
-                if u != Fail:
+                u = unification.unify(have, query, binding)
+                if u != language.FAIL:
                     yield dict(u)

@@ -93,7 +93,7 @@ class And(Term):
 
     @property
     def rest(self) -> typing.Any:
-        """Returns And with all conjuncts of this one except the first"""
+        """Returns And with all conjuncts except the first"""
         return And(self.args[1:])
 
     def __bool__(self):
@@ -121,7 +121,7 @@ class Compound(Term):
     args: tuple
 
     def __repr__(self):
-        return self.op + str(self.args)
+        return self.op + "(" + ", ".join(str(arg) for arg in self.args) + ")"
 
     def standardize(self, reset: bool, _id: int) -> "Compound":
         return Compound(
@@ -146,7 +146,8 @@ def functor(name: str, arity: typing.Optional[int] = None) -> typing.Callable:
     If arity is provided, it will be used to perform arity checks when the functor
     is called.
     """
-    def make_compound(*args) -> Compound:
+
+    def make_compound(*args: typing.Iterable[typing.Any]) -> Compound:
         if (arity is not None) and (len(args) != arity):
             raise ValueError("wrong arity")
         return Compound(name, args)
@@ -228,8 +229,8 @@ class Tail:
 
 
 class Rule:
-    def __init__(self, head: Term, body: And) -> None:
-        if not isinstance(body, typing.Iterable):
+    def __init__(self, head: Term, body: Term) -> None:
+        if not isinstance(body, (tuple, And)):
             body = [body]
 
         self.head = head
@@ -251,3 +252,15 @@ class Rule:
 
     def __repr__(self) -> str:
         return f"{self.head} <= {self.body}"
+
+
+@dataclass(frozen=True)
+class Keyword:
+    name: str
+
+    def __repr__(self):
+        return self.name
+
+
+CUT = Keyword("CUT")
+FAIL = Keyword("FAIL")

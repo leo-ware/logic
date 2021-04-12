@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "logic"
+version = "0.1.0"
+description = ""
+authors = ["Leo Ware <leoware@minerva.kgi.edu>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+anything = "^0.2.1"
+pytest = "^6.2.3"
+lark = "^0.11.1"
+bidict = "^0.21.2"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

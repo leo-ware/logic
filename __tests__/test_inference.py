@@ -17,6 +17,7 @@ KB = KnowledgeBase([
 
 
 def test_fc():
-    assert list(fc_infer(KB, sibling(X, Milo))) == [{X: Leo}, {X: Declan}]
+    assert {X: Leo} in list(fc_infer(KB, sibling(X, Milo)))
+    assert {X: Declan} in list(fc_infer(KB, sibling(X, Milo)))
     assert list(fc_infer(KB, sibling(Leo, Milo))) == [{}]
     assert list(fc_infer(KB, sibling(Declan, Milo))) == [{}]

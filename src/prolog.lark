@@ -1,0 +1,89 @@
+// ebnf for prolog (kind of)
+
+// loosely based on
+// https://en.wikipedia.org/wiki/Prolog_syntax_and_semantics
+
+// This will work for simple stuff, the feature set
+// you need for domain modeling and building most expert
+// systems. However, the structure of parse tree is
+// actually pretty different from most prolog interpreters.
+// So, e.g. this will probably not run other peoples'
+// libraries.
+
+// some lark inbuilt regexes, should be obvious
+%import common.WS
+%import common.SIGNED_NUMBER
+%import common.ESCAPED_STRING
+
+// smart, kills newlines etc.
+%ignore WS
+
+// there are a number of things the user might give us
+start: (term | conj | rule | program)
+
+// these represent different parsing options for the
+// guys outside
+program: ((declaration | rule | conj | term) ".")*
+
+// functor declarations
+// note that this ignores the dynamic key word because
+// everything is dynamic in my implementation
+declaration: "dynamic"? functor "/" arity
+arity: /[0-9]+/
+
+// the primary prolog datatype
+?term:
+    | not
+    | keyword
+    | var
+    | atom
+    | compound
+    | list                // ↓ aliases ↓
+    | SIGNED_NUMBER         -> number
+    | ESCAPED_STRING        -> string
+
+not: "\+" term
+
+// some things that should not be interpreted as atoms
+// true, false, and fail are atoms in many prologs
+// but I translate them to distinct python objects
+keyword:
+    | "!"                   -> cuts
+    | "true"                -> true
+    | "false"               -> false
+    | "fail"                -> fail
+
+// a var is an uppercase letter of underscore
+// followed by text (no spaces)
+var: /[A-Z_]\w*/
+
+// an atom is a lowercase letter followed by text (no spaces)
+// alternatively you can enclose it in single quotes and
+// use spaces
+atom:
+    | /([a-z])\w+/
+    | "'" /[a-z][\w ]*/ "'"
+
+// a compound is a functor followed by parenthesis and at
+// least one argument
+// note that i'm implementing zero-arity functors as atoms
+compound: functor "(" term ("," term)* ")"
+
+// a functor begins with a lowercase letter and followed by
+// text (no spaces)
+functor: /([a-z])\w+/
+
+// I'm implementing lists as arrays rather than linked lists
+// like in normal prolog, this because the interpreter is in
+// python and python doesn't like linked lists
+list:
+    | "[" term ("," term)* "]"
+    | "[]"
+
+rule: head  ":-" body
+head: term
+body: (term | conj | or)
+
+// note the parenthesis mean "and" takes precedence over "or"
+or: (term | conj) (";" (term | conj))+
+conj: (term | "(" or ")") ("," (term | "(" or ")"))+
