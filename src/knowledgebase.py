@@ -1,5 +1,11 @@
 import typing
-from src import types, language, unification
+from src import language, unification
+from bidict import bidict
+
+
+# types
+TYPE_BINDING = typing.Union[typing.Mapping[language.Variable, typing.Any], bidict, typing.Literal[language.FAIL]]
+TYPE_BINDINGS = typing.Iterable[TYPE_BINDING]
 
 
 class KnowledgeBase:
@@ -20,7 +26,7 @@ class KnowledgeBase:
         """
         self.rules.add(language.standardize_variables(sentence, reset=True))
 
-    def fetch(self, query: language.Term, binding: typing.Optional[types.Binding] = None) -> types.Bindings:
+    def fetch(self, query: language.Term, binding: typing.Optional[TYPE_BINDING] = None) -> TYPE_BINDINGS:
         """
         Returns bindings under which the query can be derived from facts (not rules!) in the kb
         """
@@ -31,14 +37,14 @@ class KnowledgeBase:
         else:
             return self._fetch_sentence(query, binding)
 
-    def _fetch_and(self, query: language.And, binding: typing.Optional[types.Binding] = None) -> types.Bindings:
-        for im_satisfied in self.fetch(query.head, binding):
+    def _fetch_and(self, query: language.And, binding: typing.Optional[TYPE_BINDING] = None) -> TYPE_BINDINGS:
+        for im_satisfied in self.fetch(query.first, binding):
             es = self.fetch(query.rest, im_satisfied)
             for everyone_satisfied in es:
                 if everyone_satisfied != language.FAIL:
                     yield dict(everyone_satisfied)
 
-    def _fetch_sentence(self, query: language.Term, binding: typing.Optional[types.Binding] = None) -> types.Bindings:
+    def _fetch_sentence(self, query: language.Term, binding: typing.Optional[TYPE_BINDING] = None) -> TYPE_BINDINGS:
         queue = list(self.rules)
         while queue:
             have = queue.pop()

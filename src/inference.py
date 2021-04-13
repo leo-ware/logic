@@ -1,8 +1,12 @@
-from src import language, knowledgebase, types
+import typing
+
+from src import language, knowledgebase, unification
+from src.knowledgebase import TYPE_BINDING, TYPE_BINDINGS
 
 from copy import copy
 
 
+# forward chaining
 def forward_chain(kb: knowledgebase.KnowledgeBase, inplace: bool = False) -> knowledgebase.KnowledgeBase:
     """deduce all deducible facts inplace on kb"""
 
@@ -26,9 +30,49 @@ def forward_chain(kb: knowledgebase.KnowledgeBase, inplace: bool = False) -> kno
     return kb
 
 
-def fc_infer(kb: knowledgebase.KnowledgeBase, query: language.Term, inplace: bool = False) -> types.Bindings:
+def fc_ask(kb: knowledgebase.KnowledgeBase, query: language.Term, inplace: bool = False) -> TYPE_BINDINGS:
     """use forward chaining to attempt to infer the query, returning a (potentially empty) iterable of bindings"""
     if not inplace:
         kb = copy(kb)
     forward_chain(kb, inplace=True)
     return kb.fetch(query)
+
+
+# backwards chaining
+def bc_ask(kb: knowledgebase.KnowledgeBase, query: language.Term, binding: typing.Optional[TYPE_BINDING] = None)\
+        -> TYPE_BINDINGS:
+    """Use backward chaining (naive dfs) to attempt to infer the query from KB"""
+
+    # default to empty binding
+    binding = binding or {}
+
+    # pass fails up the callstack
+    if binding == language.FAIL:
+        return language.FAIL
+
+    #  maybe we don't need to use rules
+    for free_binding in kb.fetch(query, binding):
+        yield free_binding
+        if free_binding == {}:
+            return
+
+    # special handling for Ands
+    if isinstance(query, language.And):
+        return _bc_and(kb, query, binding)
+
+    # dfs
+    for rule in kb.rules:
+        if isinstance(rule, language.Rule):
+            satisfies_head = unification.unify(rule.head, query, binding)
+            if satisfies_head != language.FAIL:
+                for result in bc_ask(kb, language.substitute(rule.body, satisfies_head)):
+                    yield result
+
+
+def _bc_and(kb: knowledgebase.KnowledgeBase, goals: language.And, binding: TYPE_BINDING) -> TYPE_BINDINGS:
+    if not goals:
+        return binding
+
+    for satisfy_first in bc_ask(kb, language.substitute(goals.first, binding), binding):
+        for satisfy_rest in _bc_and(kb, goals.rest, satisfy_first):
+            yield satisfy_rest

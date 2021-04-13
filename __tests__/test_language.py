@@ -11,7 +11,7 @@ def test_term():
 def test_and():
     x, y, z = Variable("X"), Variable("Y"), Variable("Z")
     assert (x & (y & z)) == (x & y & z) == And([x, y, z])
-    assert (x & y).head == x
+    assert (x & y).first == x
     assert (x & y).rest == And([y])
     assert iter(x & y)
 

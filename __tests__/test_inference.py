@@ -7,6 +7,7 @@ X, Y, Z = variables("XYZ")
 Leo = Literal("Leo")
 Milo = Literal("Milo")
 Declan = Literal("Declan")
+Axel = Literal("Axel")
 
 KB = KnowledgeBase([
     sibling(X, Y) <= sibling(Y, X),
@@ -16,8 +17,18 @@ KB = KnowledgeBase([
 ])
 
 
+def howto_test_inference(inf):
+    assert {X: Leo} in list(inf(KB, sibling(X, Milo)))
+    assert {X: Declan} in list(inf(KB, sibling(X, Milo)))
+    assert list(inf(KB, sibling(Leo, Milo))) == [{}]
+    assert list(inf(KB, sibling(Declan, Milo))) == [{}]
+    assert list(inf(KB, sibling(Axel, Leo))) == []
+    assert list(inf(KB, sibling(Axel, X))) == []
+
+
 def test_fc():
-    assert {X: Leo} in list(fc_infer(KB, sibling(X, Milo)))
-    assert {X: Declan} in list(fc_infer(KB, sibling(X, Milo)))
-    assert list(fc_infer(KB, sibling(Leo, Milo))) == [{}]
-    assert list(fc_infer(KB, sibling(Declan, Milo))) == [{}]
+    howto_test_inference(fc_ask)
+
+
+def test_bc():
+    howto_test_inference(bc_ask)

@@ -1,5 +1,4 @@
 import typing
-from src import types
 
 from dataclasses import dataclass
 
@@ -24,7 +23,7 @@ def standardize_variables(x: typing.Any, reset=False, _id: typing.Optional[int] 
         return x
 
 
-def substitute(x: typing.Any, binding: typing.Optional[types.Binding]):
+def substitute(x: typing.Any, binding):
     """Substitutes provided bindings for variables in term"""
     if binding is None:
         return x
@@ -79,11 +78,11 @@ class And(Term):
     def standardize(self, reset: bool, _id: int) -> "And":
         return And(standardize_variables(arg, reset, _id) for arg in self.args)
 
-    def substitute(self, binding: types.Binding) -> "And":
+    def substitute(self, binding) -> "And":
         return And(substitute(arg, binding) for arg in self.args)
 
     @property
-    def head(self) -> typing.Any:
+    def first(self) -> typing.Any:
         """The first conjunct in the And, under the assumption that it exists
 
         Raises:
@@ -129,7 +128,7 @@ class Compound(Term):
             args=tuple(standardize_variables(arg, reset, _id) for arg in self.args)
         )
 
-    def substitute(self, binding: types.Binding) -> "Compound":
+    def substitute(self, binding) -> "Compound":
         return Compound(
             op=substitute(self.op, binding),
             args=tuple(substitute(arg, binding) for arg in self.args)
@@ -192,7 +191,7 @@ class Variable(Term):
     def standardize(self, reset: bool, _id: int) -> "Variable":
         return Variable(self.name, _id if not reset else None)
 
-    def substitute(self, binding: types.Binding) -> "Variable":
+    def substitute(self, binding) -> "Variable":
         if self in binding:
             return binding[self]
         else:
