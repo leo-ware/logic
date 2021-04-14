@@ -1,14 +1,21 @@
 import typing
+from copy import copy
 
 from src import language, knowledgebase, unification
-from src.knowledgebase import TYPE_BINDING, TYPE_BINDINGS
-
-from copy import copy
+from src.unification import TYPE_BINDING, TYPE_BINDINGS
 
 
 # forward chaining
 def forward_chain(kb: knowledgebase.KnowledgeBase, inplace: bool = False) -> knowledgebase.KnowledgeBase:
-    """deduce all deducible facts inplace on kb"""
+    """deduce all deducible facts on kb
+
+    Arguments:
+        kb (KnowledgeBase): the knowledgebase to work on
+        inplace (bool): whether to replace the current kb (as opposed to copying), default False
+
+    Returns:
+        the original kb is inplace=True, otherwise a new one with all possible deductions made
+    """
 
     if inplace:
         kb = copy(kb)

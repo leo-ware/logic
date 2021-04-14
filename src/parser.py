@@ -1,6 +1,6 @@
-from lark import Lark, Transformer
-from pathlib import Path
 import typing
+from pathlib import Path
+from lark import Lark, Transformer
 
 from src import language, knowledgebase
 
@@ -64,7 +64,12 @@ class PrologTransformer(Transformer):
         return language.FAIL
 
 
-def prolog(pg: str):
+def prolog(pg: typing.Union[str, typing.IO]):
     """Parse a prolog program"""
+    try:
+        pg = pg.read()
+    except AttributeError:
+        pass
+
     parse_tree = parser.parse(pg)
     return PrologTransformer().transform(parse_tree)

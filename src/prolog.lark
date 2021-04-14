@@ -42,7 +42,9 @@ arity: /[0-9]+/
     | SIGNED_NUMBER         -> number
     | ESCAPED_STRING        -> string
 
-neg: "\+" term
+neg:
+    | "\+" term
+    | "not(" term ")"
 
 // some things that should not be interpreted as atoms
 // true, false, and fail are atoms in many prologs

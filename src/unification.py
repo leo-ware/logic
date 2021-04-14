@@ -1,6 +1,11 @@
 from typing import Any, Union, Iterable
 from src import language
 from bidict import bidict
+import typing
+
+# types
+TYPE_BINDING = typing.Union[typing.Mapping[language.Variable, typing.Any], bidict, typing.Literal[language.FAIL]]
+TYPE_BINDINGS = typing.Iterable[TYPE_BINDING]
 
 
 def occur_check(var: language.Variable, val: Union[tuple, language.Term]) -> bool:

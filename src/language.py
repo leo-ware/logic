@@ -135,10 +135,10 @@ class Not(Term):
         return "~" + self.term.__repr__()
 
     def standardize(self, *args, **kwargs):
-        return self.term.standardize(*args, **kwargs)
+        return Not(self.term.standardize(*args, **kwargs))
 
     def substitute(self, binding):
-        return self.term.substitute(binding)
+        return Not(self.term.substitute(binding))
 
 
 @dataclass(frozen=True)
