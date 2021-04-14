@@ -19,11 +19,11 @@
 %ignore WS
 
 // there are a number of things the user might give us
-start: (term | conj | rule | program)
+start: (term | conj | disj | rule | program)
 
 // these represent different parsing options for the
 // guys outside
-program: ((declaration | rule | conj | term) ".")*
+program: ((declaration | rule | conj | disj | term) ".")*
 
 // functor declarations
 // note that this ignores the dynamic key word because
@@ -33,7 +33,7 @@ arity: /[0-9]+/
 
 // the primary prolog datatype
 ?term:
-    | not
+    | neg
     | keyword
     | var
     | atom
@@ -42,7 +42,7 @@ arity: /[0-9]+/
     | SIGNED_NUMBER         -> number
     | ESCAPED_STRING        -> string
 
-not: "\+" term
+neg: "\+" term
 
 // some things that should not be interpreted as atoms
 // true, false, and fail are atoms in many prologs
@@ -82,8 +82,8 @@ list:
 
 rule: head  ":-" body
 head: term
-body: (term | conj | or)
+body: (term | conj | disj)
 
 // note the parenthesis mean "and" takes precedence over "or"
-or: (term | conj) (";" (term | conj))+
-conj: (term | "(" or ")") ("," (term | "(" or ")"))+
+disj: (term | conj) (";" (term | conj))+
+conj: (term | "(" disj ")") ("," (term | "(" disj ")"))+

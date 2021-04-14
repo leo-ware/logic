@@ -1,6 +1,8 @@
 from lark import Lark, Transformer
-from src import language, knowledgebase
 from pathlib import Path
+import typing
+
+from src import language, knowledgebase
 
 # get the right file regardless of working directory
 filename = Path(__file__).parent / "prolog.lark"
@@ -22,9 +24,6 @@ class PrologTransformer(Transformer):
         return language.Literal(tree[0])
 
     def var(self, tree):
-        # print("!!!!!")
-        # print(language.Variable(str(tree[0])))
-        # print(type(language.Variable(str(tree[0]))))
         return language.Variable(str(tree[0]))
 
     def list(self, tree):
@@ -38,6 +37,12 @@ class PrologTransformer(Transformer):
 
     def conj(self, tree):
         return language.And(tree)
+
+    def disj(self, tree):
+        return language.Or(tree)
+
+    def neg(self, tree):
+        return language.Not(tree[0])
 
     def rule(self, tree):
         return language.Rule(
@@ -59,11 +64,7 @@ class PrologTransformer(Transformer):
         return language.FAIL
 
 
-def prolog(pg: str) -> knowledgebase.KnowledgeBase:
+def prolog(pg: str):
     """Parse a prolog program"""
     parse_tree = parser.parse(pg)
     return PrologTransformer().transform(parse_tree)
-
-
-print(parser.parse("foo(X)").pretty())
-print(prolog("foo(X)"))

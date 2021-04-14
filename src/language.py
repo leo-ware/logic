@@ -1,5 +1,5 @@
 import typing
-
+import abc
 from dataclasses import dataclass
 
 _vid = 1000
@@ -36,20 +36,30 @@ def substitute(x: typing.Any, binding):
         return x
 
 
-class Term:
+class Term(abc.ABC):
     def __contains__(self, var: "Variable"):
         if isinstance(self, Literal):
             return False
 
         return (
                 (isinstance(self, Variable) and (var == self)) or
-                (isinstance(self, (And, Compound)) and
+                (isinstance(self, Not) and (var in self.term)) or
+                (isinstance(self, (Join, Compound)) and
                  (var in self.args or
                   any(var in arg for arg in self.args)))
         )
 
     def __and__(self, other):
         return And((self, other))
+
+    def __or__(self, other):
+        return Or((self, other))
+
+    def __neg__(self):
+        return Not(self)
+
+    def __invert__(self):
+        return Not(self)
 
     def __le__(self, body):
         return Rule(self, body)
@@ -61,39 +71,40 @@ class Term:
         return self
 
 
-class And(Term):
+class Join(Term, abc.ABC):
+    SYM = "JOIN"
+
     def __init__(self, args: typing.Iterable):
         self.args = self._merge(args)
 
-    @staticmethod
-    def _merge(args: typing.Iterable) -> tuple:
+    def _merge(self, args: typing.Iterable) -> tuple:
         new = []
         for item in args:
-            if isinstance(item, And):
+            if isinstance(item, self.__class__):
                 new.extend(item.args)
             else:
                 new.append(item)
         return tuple(new)
 
-    def standardize(self, reset: bool, _id: int) -> "And":
-        return And(standardize_variables(arg, reset, _id) for arg in self.args)
+    def standardize(self, reset: bool, _id: int):
+        return self.__class__(standardize_variables(arg, reset, _id) for arg in self.args)
 
-    def substitute(self, binding) -> "And":
-        return And(substitute(arg, binding) for arg in self.args)
+    def substitute(self, binding):
+        return self.__class__(substitute(arg, binding) for arg in self.args)
 
     @property
     def first(self) -> typing.Any:
-        """The first conjunct in the And, under the assumption that it exists
+        """The first conjunct in the Join, under the assumption that it exists
 
         Raises:
-            IndexError: if the And is empty
+            IndexError: if the Join is empty
         """
         return self.args[0]
 
     @property
     def rest(self) -> typing.Any:
-        """Returns And with all conjuncts except the first"""
-        return And(self.args[1:])
+        """Returns Join with all conjuncts except the first"""
+        return self.__class__(self.args[1:])
 
     def __bool__(self):
         return bool(self.args)
@@ -105,7 +116,29 @@ class And(Term):
         return (type(self) == type(other)) & (self.args == other.args)
 
     def __repr__(self):
-        return " & ".join(i.__repr__() for i in self.args)
+        return f" {self.__class__.SYM} ".join(i.__repr__() for i in self.args)
+
+
+class And(Join):
+    SYM = "&"
+
+
+class Or(Join):
+    SYM = "|"
+
+
+@dataclass(frozen=True)
+class Not(Term):
+    term: Term
+
+    def __repr__(self):
+        return "~" + self.term.__repr__()
+
+    def standardize(self, *args, **kwargs):
+        return self.term.standardize(*args, **kwargs)
+
+    def substitute(self, binding):
+        return self.term.substitute(binding)
 
 
 @dataclass(frozen=True)

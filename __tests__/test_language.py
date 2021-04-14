@@ -1,19 +1,39 @@
 from src.language import *
 
 
-def test_term():
-    term = Term()
-    x = Variable("X")
-    assert term & term == And([term, term])
-    assert x in (x & 'foo')
-
-
 def test_and():
     x, y, z = Variable("X"), Variable("Y"), Variable("Z")
     assert (x & (y & z)) == (x & y & z) == And([x, y, z])
     assert (x & y).first == x
     assert (x & y).rest == And([y])
     assert iter(x & y)
+
+
+def test_or():
+    x, y, z = Variable("X"), Variable("Y"), Variable("Z")
+    assert (x | (y | z)) == (x | y | z) == Or([x, y, z])
+    assert (x | y).first == x
+    assert (x | y).rest == Or([y])
+    assert iter(x & y)
+
+
+def test_neg():
+    x, y = variables("XY")
+    assert ~x == -x == Not(x)
+    assert ~(x & y) == Not(And([x, y]))
+
+
+def test_oops():
+    x, y, z = Variable("X"), Variable("Y"), Variable("Z")
+    assert x & y | z in [
+        Or([And([x, y]), z]),
+        Or([And([y, x]), z]),
+        Or([z, And([x, y])]),
+        Or([z, And([y, x])])
+    ]
+    assert isinstance(x & y | z <= y, Rule)
+    assert isinstance(-x & y, And)
+    assert isinstance(~(x & y) | z, Or)
 
 
 def test_compound():
