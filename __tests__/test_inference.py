@@ -1,34 +1,32 @@
-from src.inference import *
-from src.language import *
-from src.knowledgebase import KnowledgeBase
+from src import *
+from pytest import raises
 
 sibling = functor("sibling", 2)
 X, Y, Z = variables("XYZ")
-Leo = Literal("Leo")
-Milo = Literal("Milo")
-Declan = Literal("Declan")
-Axel = Literal("Axel")
+Leo = Term("Leo")
+Milo = Term("Milo")
+Declan = Term("Declan")
+Axel = Term("Axel")
 
-KB = KnowledgeBase([
+KB = KnowledgeBase(LinearTable(), [
+    sibling(Milo, Leo),
+    sibling(Leo, Declan),
     sibling(X, Y) <= sibling(Y, X),
     sibling(X, Y) <= sibling(X, Z) & sibling(Z, Y),
-    sibling(Milo, Leo),
-    sibling(Leo, Declan)
 ])
 
 
-def howto_test_inference(inf):
-    assert {X: Leo} in list(inf(KB, sibling(X, Milo)))
-    assert {X: Declan} in list(inf(KB, sibling(X, Milo)))
-    assert list(inf(KB, sibling(Leo, Milo))) == [{}]
-    assert list(inf(KB, sibling(Declan, Milo))) == [{}]
-    assert list(inf(KB, sibling(Axel, Leo))) == []
-    assert list(inf(KB, sibling(Axel, X))) == []
-
-
 def test_fc():
-    howto_test_inference(fc_ask)
+    assert {X: Leo} in list(fc_ask(KB, sibling(X, Milo)))
+    assert {X: Declan} in list(fc_ask(KB, sibling(X, Milo)))
+    assert list(fc_ask(KB, sibling(Leo, Milo))) == [{}]
+    assert list(fc_ask(KB, sibling(Declan, Milo))) == [{}]
+    assert list(fc_ask(KB, sibling(Axel, Leo))) == []
+    assert list(fc_ask(KB, sibling(Axel, X))) == []
 
 
 def test_bc():
-    howto_test_inference(bc_ask)
+    assert {X: Leo} == next(bc_ask(KB, sibling(X, Milo)))
+    assert next(bc_ask(KB, sibling(Leo, Milo))) == {}
+    with raises(RecursionError):
+        next(bc_ask(KB, sibling(Axel, Leo)))

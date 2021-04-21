@@ -1,53 +1,51 @@
 import typing
 import abc
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 _vid = 1000
 """used in variable renaming"""
 
 
-def standardize_variables(x: typing.Any, reset=False, _id: typing.Optional[int] = None):
+def variables_in(x: "Logical"):
+    vs = set()
+
+    def _report_variables_in(thing):
+        if isinstance(thing, Variable):
+            vs.add(thing)
+        return thing
+
+    x.map(_report_variables_in)
+    return vs
+
+
+def standardize(x: typing.Union["Rule", "Logical"], reset: bool = False):
     """Renames all the variables in a term"""
     global _vid
 
-    if _id is None:
+    if reset:
+        _id = None
+    else:
         _id = _vid
         _vid += 1
 
-    if reset:
-        _id = None
+    def _do_standardize(_x):
+        if isinstance(_x, Variable):
+            return replace(_x, _id=_id)
+        return _x
 
-    try:
-        return x.standardize(reset, _id)
-    except AttributeError:
-        return x
+    return x.map(_do_standardize)
 
 
-def substitute(x: typing.Any, binding):
+def substitute(x: typing.Union["Rule", "Logical"], binding):
     """Substitutes provided bindings for variables in term"""
-    if binding is None:
-        return x
-
-    if isinstance(x, Term):
-        return x.substitute(binding)
-    elif isinstance(x, tuple):
-        return tuple(substitute(y, binding) for y in x)
-    else:
-        return x
+    def _do_substitute(_x):
+        if _x in binding:
+            return binding[_x]
+        return _x
+    return x.map(_do_substitute)
 
 
-class Term(abc.ABC):
-    def __contains__(self, var: "Variable"):
-        if isinstance(self, Literal):
-            return False
-
-        return (
-                (isinstance(self, Variable) and (var == self)) or
-                (isinstance(self, Not) and (var in self.term)) or
-                (isinstance(self, (Join, Compound)) and
-                 (var in self.args or
-                  any(var in arg for arg in self.args)))
-        )
+class Logical(abc.ABC):
 
     def __and__(self, other):
         return And((self, other))
@@ -61,18 +59,31 @@ class Term(abc.ABC):
     def __invert__(self):
         return Not(self)
 
-    def __le__(self, body):
-        return Rule(self, body)
-
-    def standardize(self, *_, **__):
-        return self
-
-    def substitute(self, _):
-        return self
+    @abc.abstractmethod
+    def map(self, func):
+        """Apply func to every non Logical child and map func onto every Logical one"""
+        pass
 
 
-class Join(Term, abc.ABC):
+@dataclass(frozen=True)
+class Keyword(Logical):
+    name: str
+
+    def __repr__(self):
+        return self.name
+
+    def map(self, func):
+        return func(self)
+
+
+CUT = Keyword("CUT")
+FAIL = Keyword("FAIL")
+TRUE = Keyword("TRUE")
+
+
+class Join(Logical, abc.ABC):
     SYM = "JOIN"
+    ignore = object()  # anonymous placeholder object
 
     def __init__(self, args: typing.Iterable):
         self.args = self._merge(args)
@@ -82,15 +93,14 @@ class Join(Term, abc.ABC):
         for item in args:
             if isinstance(item, self.__class__):
                 new.extend(item.args)
+            elif item is self.__class__.ignore:
+                pass
             else:
                 new.append(item)
         return tuple(new)
 
-    def standardize(self, reset: bool, _id: int):
-        return self.__class__(standardize_variables(arg, reset, _id) for arg in self.args)
-
-    def substitute(self, binding):
-        return self.__class__(substitute(arg, binding) for arg in self.args)
+    def map(self, func):
+        return self.__class__(arg.map(func) if isinstance(arg, Logical) else func(arg) for arg in self.args)
 
     @property
     def first(self) -> typing.Any:
@@ -106,6 +116,9 @@ class Join(Term, abc.ABC):
         """Returns Join with all conjuncts except the first"""
         return self.__class__(self.args[1:])
 
+    def __hash__(self):
+        return hash(self.args)
+
     def __bool__(self):
         return bool(self.args)
 
@@ -113,59 +126,64 @@ class Join(Term, abc.ABC):
         return iter(self.args)
 
     def __eq__(self, other):
-        return (type(self) == type(other)) & (self.args == other.args)
+        return (type(self) == type(other)) and (self.args == other.args)
 
     def __repr__(self):
-        return f" {self.__class__.SYM} ".join(i.__repr__() for i in self.args)
+        if len(self.args) > 1:
+            return f" {self.__class__.SYM} ".join(i.__repr__() for i in self.args)
+        elif self:
+            return f"<And {self.first}>"
+        else:
+            return f"<empty {self.__class__.__name__}>"
 
 
 class And(Join):
     SYM = "&"
+    ignore = TRUE
 
 
 class Or(Join):
     SYM = "|"
+    ignore = FAIL
 
 
 @dataclass(frozen=True)
-class Not(Term):
-    term: Term
+class Not(Logical):
+    item: Logical
 
     def __repr__(self):
-        return "~" + self.term.__repr__()
+        return "~" + self.item.__repr__()
 
-    def standardize(self, *args, **kwargs):
-        return Not(self.term.standardize(*args, **kwargs))
-
-    def substitute(self, binding):
-        return Not(self.term.substitute(binding))
+    def map(self, func):
+        return Not(self.item.map(func))
 
 
 @dataclass(frozen=True)
-class Compound(Term):
-    """Term used for representing logical sentences
+class Term(Logical):
+    """The datatype for representing logical claims
 
-    Compounds have a name and a list of arguments, and they are used for
+    Terms have a name and (optionally) a list of arguments, and they are used for
     representing logical sentences. Example: you could represent the prolog
-    sentence `sibling(leo, milo)` with `Compound("sibling", ["leo", "milo"])`
+    sentence `sibling(leo, milo)` with `Term("sibling", ["leo", "milo"])`
+
+    Attributes:
+        op - the functor, a string
+        args - tuple of arguments (terms or strings)
     """
     op: str
-    args: tuple
+    args: tuple = ()
 
     def __repr__(self):
-        return self.op + "(" + ", ".join(str(arg) for arg in self.args) + ")"
+        if self.args:
+            return self.op + "(" + ", ".join(str(arg) for arg in self.args) + ")"
+        else:
+            return self.op
 
-    def standardize(self, reset: bool, _id: int) -> "Compound":
-        return Compound(
-            op=standardize_variables(self.op, reset, _id),
-            args=tuple(standardize_variables(arg, reset, _id) for arg in self.args)
-        )
+    def __le__(self, other: Logical) -> "Rule":
+        return Rule(self, other)
 
-    def substitute(self, binding) -> "Compound":
-        return Compound(
-            op=substitute(self.op, binding),
-            args=tuple(substitute(arg, binding) for arg in self.args)
-        )
+    def map(self, func):
+        return Term(self.op, tuple(func(arg) for arg in self.args))
 
 
 def functor(name: str, arity: typing.Optional[int] = None) -> typing.Callable:
@@ -179,36 +197,16 @@ def functor(name: str, arity: typing.Optional[int] = None) -> typing.Callable:
     is called.
     """
 
-    def make_compound(*args: typing.Iterable[typing.Any]) -> Compound:
+    def make_term(*args: typing.Iterable[typing.Any]) -> Term:
         if (arity is not None) and (len(args) != arity):
             raise ValueError("wrong arity")
-        return Compound(name, args)
+        return Term(name, args)
 
-    return make_compound
-
-
-@dataclass(frozen=True)
-class Literal(Term):
-    """Immutable class corresponding to prolog's Atom
-
-    Using a Literal with some name is functionally equivalent to just straitup using
-    the name (they are even `__eq__`ual), but these support infix operations
-    """
-    name: str
-
-    # make it interchangeable with str
-    def __eq__(self, other):
-        return self.name == other
-
-    def __hash__(self):
-        return hash(self.name)
-
-    def __repr__(self):
-        return self.name
+    return make_term
 
 
 @dataclass(frozen=True)
-class Variable(Term):
+class Variable(Logical):
     name: str
     _id: typing.Optional[int] = None
 
@@ -221,14 +219,11 @@ class Variable(Term):
         else:
             return self.name
 
-    def standardize(self, reset: bool, _id: int) -> "Variable":
-        return Variable(self.name, _id if not reset else None)
+    def to_var(self):
+        return Variable(self.name, self._id)
 
-    def substitute(self, binding) -> "Variable":
-        if self in binding:
-            return binding[self]
-        else:
-            return self
+    def map(self, func):
+        return func(self)
 
 
 def variables(s):
@@ -239,60 +234,32 @@ def variables(s):
     return tuple(Variable(c) for c in s)
 
 
-@dataclass(frozen=True)
-class Tail:
+class Tail(Variable):
     """Variable-like class used for tail unification
 
     These can be created using the unary "+" on variables. This is equivalent to the prolog "|".
     Best explained with an example: the prolog `X = [H | T]` and the python `unify(X, [H, +T])`
     represent the same thing.
     """
-    name: str
-    _id: typing.Optional[int] = None
-
     def __repr__(self):
         return "+" + self.name
 
-    def standardize(self, _id: int, reset: bool) -> "Tail":
-        return Tail(self.name, _id if not reset else None)
 
-    def to_var(self) -> Variable:
-        return Variable(self.name, self._id)
-
-
+@dataclass(frozen=True)
 class Rule:
-    def __init__(self, head: Term, body: Term) -> None:
-        if not isinstance(body, (tuple, And)):
-            body = [body]
+    head: Term
+    body: Logical = TRUE
 
-        self.head = head
-        self.body = And(body)
+    @property
+    def op(self):
+        return self.head.op
 
-    def standardize(self, reset: bool, _id: int) -> "Rule":
-        return Rule(standardize_variables(self.head, reset=reset, _id=_id),
-                    standardize_variables(self.body, reset=reset, _id=_id))
+    @property
+    def args(self):
+        return self.head.args
 
-    def __hash__(self):
-        return hash(str(self))
-
-    def __eq__(self, other):
-        return all([
-            type(self) == type(other),
-            self.head == other.head,
-            self.body == other.body
-        ])
+    def map(self, func):
+        return Rule(self.head.map(func), self.body.map(func))
 
     def __repr__(self) -> str:
         return f"{self.head} <= {self.body}"
-
-
-@dataclass(frozen=True)
-class Keyword:
-    name: str
-
-    def __repr__(self):
-        return self.name
-
-
-CUT = Keyword("CUT")
-FAIL = Keyword("FAIL")

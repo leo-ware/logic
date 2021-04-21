@@ -31,29 +31,37 @@ def test_oops():
         Or([z, And([x, y])]),
         Or([z, And([y, x])])
     ]
-    assert isinstance(x & y | z <= y, Rule)
     assert isinstance(-x & y, And)
     assert isinstance(~(x & y) | z, Or)
 
 
 def test_compound():
     x, y, z = Variable("X"), Variable("Y"), Variable("Z")
-    foo = Compound("bigger", (x, 1))
+    foo = Term("bigger", (x, 1))
     assert foo.op == 'bigger'
     assert foo.args == (x, 1)
 
 
+def test_variables_in():
+    x, y, z = variables("xyz")
+    harry, ron = Term("harry"), Term("ron")
+    assert variables_in(x & y | ron) == {x, y}
+    assert variables_in(x) == {x}
+    assert variables_in(harry & y) == {y}
+    assert variables_in(And([])) == set()
+
+
 def test_substitute():
     x, y, z = Variable("X"), Variable("Y"), Variable("Z")
-    foo = Compound("bigger", (x, 1))
-    a, b = foo.substitute({x: 'foo'}), Compound("bigger", ('foo', 1))
+    foo = Term("bigger", (x, 1))
+    a, b = substitute(foo, {x: 'foo'}), Term("bigger", ('foo', 1))
 
     assert a.op == b.op
     assert a.args == b.args
-    assert (x & y).substitute({x: 'foo'}) == And(['foo', y])
-    assert (x & ((x & z) & y) & z).substitute({z: 'foo'}) == (x & ((x & 'foo') & y) & 'foo')
+    assert substitute((x & y), {x: 'foo'}) == And(['foo', y])
+    assert substitute((x & ((x & z) & y) & z), {z: 'foo'}) == (x & ((x & 'foo') & y) & 'foo')
 
 
 def test_standardize():
     x, y, z = Variable("X"), Variable("Y"), Variable("Z")
-    assert standardize_variables(x, _id=10) == Variable("X", 10)
+    assert standardize(x) != Variable("X")

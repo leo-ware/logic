@@ -1,25 +1,23 @@
+import itertools
 from typing import Any, Union, Iterable
 from src import language
 from bidict import bidict
 import typing
 
 # types
-TYPE_BINDING = typing.Union[typing.Mapping[language.Variable, typing.Any], bidict, typing.Literal[language.FAIL]]
-TYPE_BINDINGS = typing.Iterable[TYPE_BINDING]
+TYPE_BINDING = typing.Union[typing.Mapping[language.Variable, typing.Any], bidict, language.Keyword]
+TYPE_BINDING_OPTIONAL = typing.Optional[typing.Union[typing.Mapping[language.Variable, typing.Any], bidict,
+                                                     language.Keyword]]
+TYPE_BINDINGS = typing.Iterable[typing.Union[typing.Mapping[language.Variable, typing.Any], bidict, language.Keyword]]
 
 
-def occur_check(var: language.Variable, val: Union[tuple, language.Term]) -> bool:
+# TODO fix occur check
+def occur_check(var: language.Variable, val: Union[tuple, language.Logical]) -> bool:
     """whether var occurs in val, because if so we can't unify"""
-    if isinstance(val, tuple):
-        return any(occur_check(var, v) for v in val)
-
-    try:
-        return var in val
-    except TypeError:
-        return False
+    return False  # fix later
 
 
-def unify_variable(var: language.Variable, val: Any, binding: bidict):
+def unify_variable(var: language.Variable, val: Any, binding: TYPE_BINDING) -> TYPE_BINDING:
     if var in binding:
         return unify(binding[var], val, binding)
     elif val in binding.inverse:
@@ -31,7 +29,7 @@ def unify_variable(var: language.Variable, val: Any, binding: bidict):
         return binding
 
 
-def unify_compound(x: language.Compound, y: language.Compound, binding: bidict):
+def unify_term(x: language.Term, y: language.Term, binding: TYPE_BINDING) -> TYPE_BINDING:
     """
     Unifies two compounds, optionally subject to a binding, returning a binding
     """
@@ -41,6 +39,7 @@ def unify_compound(x: language.Compound, y: language.Compound, binding: bidict):
         return unify(x.args, y.args, unify(x.op, y.op, binding))
 
 
+# TODO fix tail unification
 def tail(item: tuple) -> bool:
     """
     Figures out whether the tuple is length 1 and ends in a tail variable
@@ -51,7 +50,7 @@ def tail(item: tuple) -> bool:
         return False
 
 
-def unify_tuple(x: tuple, y: tuple, binding):
+def unify_tuple(x: tuple, y: tuple, binding: TYPE_BINDING) -> TYPE_BINDING:
     """
     Unifies two tuples, optionally subject to a binding, returning a binding
     """
@@ -65,7 +64,7 @@ def unify_tuple(x: tuple, y: tuple, binding):
         return unify(x[1:], y[1:], unify(x[0], y[0], binding))
 
 
-def unify(x: Any, y: Any, binding=None):
+def unify(x: Any, y: Any, binding: TYPE_BINDING_OPTIONAL = None) -> TYPE_BINDING:
     """
     Unifies two objects, optionally subject a binding, and returns the resulting binding
     """
@@ -77,7 +76,7 @@ def unify(x: Any, y: Any, binding=None):
     # we might get weird user input formats
     binding = bidict(binding)
 
-    # we need stuff to be immutable
+    # # we need stuff to be immutable
     x = tuple(x) if isinstance(x, Iterable) and not isinstance(x, str) else x
     y = tuple(y) if isinstance(y, Iterable) and not isinstance(x, str) else y
 
@@ -88,8 +87,8 @@ def unify(x: Any, y: Any, binding=None):
         return unify_variable(x, y, binding)
     elif isinstance(y, language.Variable):
         return unify_variable(y, x, binding)
-    elif isinstance(x, language.Compound) and isinstance(y, language.Compound):
-        return unify_compound(x, y, binding)
+    elif isinstance(x, language.Term) and isinstance(y, language.Term):
+        return unify_term(x, y, binding)
     elif isinstance(x, tuple) and isinstance(y, tuple):
         return unify_tuple(x, y, binding)
     else:

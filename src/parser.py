@@ -1,8 +1,8 @@
-import typing
 from pathlib import Path
 from lark import Lark, Transformer
+import typing
 
-from src import language, knowledgebase
+from src import language, table, knowledgebase
 
 # get the right file regardless of working directory
 filename = Path(__file__).parent / "prolog.lark"
@@ -18,10 +18,7 @@ class PrologTransformer(Transformer):
         return tree[0]
 
     def program(self, tree):
-        return knowledgebase.KnowledgeBase(tree)
-
-    def atom(self, tree):
-        return language.Literal(tree[0])
+        return knowledgebase.KnowledgeBase(table.LinearTable(), tree)
 
     def var(self, tree):
         return language.Variable(str(tree[0]))
@@ -32,8 +29,8 @@ class PrologTransformer(Transformer):
     def functor(self, tree):
         return tree[0]
 
-    def compound(self, tree):
-        return language.Compound(str(tree[0]), tuple(tree[1:]))
+    def compound_term(self, tree):
+        return language.Term(str(tree[0]), tuple(tree[1:]))
 
     def conj(self, tree):
         return language.And(tree)
@@ -55,10 +52,10 @@ class PrologTransformer(Transformer):
         return language.CUT
 
     def true(self, _):
-        return True
+        return language.TRUE
 
     def false(self, _):
-        return False
+        return language.FAIL
 
     def fail(self, _):
         return language.FAIL
