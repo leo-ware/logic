@@ -1,4 +1,3 @@
-import itertools
 from typing import Any, Union, Iterable
 from src import language
 from bidict import bidict
@@ -9,6 +8,19 @@ TYPE_BINDING = typing.Union[typing.Mapping[language.Variable, typing.Any], bidic
 TYPE_BINDING_OPTIONAL = typing.Optional[typing.Union[typing.Mapping[language.Variable, typing.Any], bidict,
                                                      language.Keyword]]
 TYPE_BINDINGS = typing.Iterable[typing.Union[typing.Mapping[language.Variable, typing.Any], bidict, language.Keyword]]
+
+
+def value(var, binding):
+    """finds the value of variable in binding, returning FREE if none exists"""
+    if not isinstance(var, language.Variable):
+        return var
+    elif var not in binding:
+        return language.FREE
+
+    if isinstance(binding[var], language.Variable):
+        return value(binding[var], binding)
+    else:
+        return binding[var]
 
 
 # TODO fix occur check
@@ -23,7 +35,7 @@ def unify_variable(var: language.Variable, val: Any, binding: TYPE_BINDING) -> T
     elif val in binding.inverse:
         return unify(var, binding.inverse[val], binding)
     elif occur_check(var, val):
-        return language.FAIL
+        return language.NO
     else:
         binding[var] = val
         return binding
@@ -34,7 +46,7 @@ def unify_term(x: language.Term, y: language.Term, binding: TYPE_BINDING) -> TYP
     Unifies two compounds, optionally subject to a binding, returning a binding
     """
     if not len(x.args) == len(y.args):
-        return language.FAIL
+        return language.NO
     else:
         return unify(x.args, y.args, unify(x.op, y.op, binding))
 
@@ -59,7 +71,7 @@ def unify_tuple(x: tuple, y: tuple, binding: TYPE_BINDING) -> TYPE_BINDING:
     elif tail(y):
         return unify(y[0].to_var(), x, binding)
     elif bool(x) != bool(y):
-        return language.FAIL
+        return language.NO
     else:
         return unify(x[1:], y[1:], unify(x[0], y[0], binding))
 
@@ -70,8 +82,8 @@ def unify(x: Any, y: Any, binding: TYPE_BINDING_OPTIONAL = None) -> TYPE_BINDING
     """
 
     # language.FAILs get passed up the callstack
-    if binding == language.FAIL:
-        return language.FAIL
+    if binding == language.NO:
+        return language.NO
 
     # we might get weird user input formats
     binding = bidict(binding)
@@ -92,4 +104,4 @@ def unify(x: Any, y: Any, binding: TYPE_BINDING_OPTIONAL = None) -> TYPE_BINDING
     elif isinstance(x, tuple) and isinstance(y, tuple):
         return unify_tuple(x, y, binding)
     else:
-        return language.FAIL
+        return language.NO

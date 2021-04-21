@@ -77,8 +77,9 @@ class Keyword(Logical):
 
 
 CUT = Keyword("CUT")
-FAIL = Keyword("FAIL")
-TRUE = Keyword("TRUE")
+FREE = Keyword("FREE")
+NO = Keyword("FAIL")
+YES = Keyword("TRUE")
 
 
 class Join(Logical, abc.ABC):
@@ -126,6 +127,12 @@ class Join(Logical, abc.ABC):
         return iter(self.args)
 
     def __eq__(self, other):
+        # TODO possibly better solution to redefine YES and NO as empty conjunct and disjunct
+        if not self.args and type(self) == And and other == YES:
+            return True
+        if not self.args and type(self) == Or and other == NO:
+            return True
+
         return (type(self) == type(other)) and (self.args == other.args)
 
     def __repr__(self):
@@ -139,12 +146,12 @@ class Join(Logical, abc.ABC):
 
 class And(Join):
     SYM = "&"
-    ignore = TRUE
+    ignore = YES
 
 
 class Or(Join):
     SYM = "|"
-    ignore = FAIL
+    ignore = NO
 
 
 @dataclass(frozen=True)
@@ -248,7 +255,7 @@ class Tail(Variable):
 @dataclass(frozen=True)
 class Rule:
     head: Term
-    body: Logical = TRUE
+    body: Logical = YES
 
     @property
     def op(self):

@@ -58,7 +58,7 @@ class LinearTable(AbstractTable):
             -> typing.Iterator[FetchResult]:
         for rule in self.rules():
             rule_binding = unification.unify(rule.head, query, binding or {})
-            if (rule_binding != language.FAIL) and ((rule.body is language.TRUE) or conditional):
+            if (rule_binding != language.NO) and ((rule.body is language.YES) or conditional):
                 rule_binding.update(binding)  # pass on irrelevant constraints
                 yield FetchResult(rule_binding, language.substitute(rule.body, rule_binding))
 
@@ -76,7 +76,7 @@ class TrieTable(AbstractTable):
     def tell_destructured(self, head: tuple, body: language.Logical):
         if head:
             self.trie[head[0]].tell_destructured(head[1:], body)
-        elif body == language.TRUE:
+        elif body == language.YES:
             self.unconditional = True
         else:
             self.conditional.append(body)
@@ -87,7 +87,7 @@ class TrieTable(AbstractTable):
 
     def conditions(self, conditional: bool):
         if self.unconditional:
-            yield language.TRUE
+            yield language.YES
         if conditional:
             for condition in self.conditional:
                 yield condition
@@ -99,7 +99,7 @@ class TrieTable(AbstractTable):
                 self.trie[query[0]]  # creates sub-trie
             for key in self.trie:
                 this_binding = unification.unify(query[0], key, binding)
-                if this_binding != language.FAIL:
+                if this_binding != language.NO:
                     for result in self.trie[key]._fetch(query[1:], conditional, this_binding):
                         yield result
         else:
@@ -115,7 +115,7 @@ class TrieTable(AbstractTable):
         # base cases
         term = language.Term(_op, _args)
         if self.unconditional:
-            yield language.Rule(term, language.TRUE)
+            yield language.Rule(term, language.YES)
 
         for condition in self.conditional:
             yield language.Rule(term, condition)
@@ -142,7 +142,7 @@ class HeuristicIndex(AbstractTable):
 
     @functools.lru_cache(maxsize=2000)
     def score(self, condition: language.Logical):  # lower is faster
-        if condition == language.TRUE:
+        if condition == language.YES:
             return 0
         elif isinstance(condition, language.Term):
             return 1

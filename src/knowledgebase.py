@@ -1,6 +1,6 @@
 import itertools
 import typing
-from src import language, table as t
+from src import language, table as t, constraints
 from src.unification import TYPE_BINDING
 
 # TODO why do some unconditional queries return condition of empty And?
@@ -17,33 +17,45 @@ class KnowledgeBase(t.AbstractTable):
 
     def fetch(self, query: language.Logical, conditional: bool = False, binding: typing.Optional[TYPE_BINDING] = None) \
             -> typing.Iterator[t.FetchResult]:
-        if isinstance(query, language.Keyword):
-            if query == language.TRUE:
-                return iter([t.FetchResult(binding or {}, language.TRUE)])
-            elif query == language.FAIL:
-                return iter([t.FetchResult(language.FAIL, language.FAIL)])
+        binding = binding or {}
+        if binding == language.NO:
+            return iter([t.FetchResult(language.NO, language.NO)])
+        if isinstance(query, language.Keyword):  # must be first branch
+            if query == language.YES:
+                return iter([t.FetchResult(binding, language.YES)])
+            elif query == language.NO:
+                return iter([t.FetchResult(language.NO, language.NO)])
             else:
                 raise ValueError(f"don't know what to do with {query}")
+        elif isinstance(query, language.Not):
+            try:
+                next(self.fetch(query.item, conditional, binding))
+                return [t.FetchResult(language.NO, language.NO)]
+            except StopIteration:
+                return [t.FetchResult(binding, language.YES)]
+        elif isinstance(query, constraints.Constraint):
+            return (t.FetchResult(b, language.YES) for b in query.test(binding))
         elif isinstance(query, language.Or):
             return itertools.chain(*(self.fetch(q, binding=binding) for q in query))
+        elif isinstance(query, language.And):
+            return self._fetch_and(query, conditional=conditional, binding=binding)
         elif isinstance(query, language.Term):
             return self.table.fetch(query, conditional=conditional, binding=binding)
-        elif isinstance(query, language.And):
-            return self._fetch_and(query, conditional=conditional, binding=binding or {})
         else:
             raise ValueError(f"can't fetch type {type(query)}")
 
     def _fetch_and(self, query: language.And, conditional: bool = False, binding: typing.Optional[TYPE_BINDING] = None)\
-            -> typing.Iterable[t.FetchResult]:
-
+            -> typing.Iterator[t.FetchResult]:
         if not query:
-            yield t.FetchResult(dict(binding), language.TRUE)
+            yield t.FetchResult(dict(binding), language.YES)
         else:
             for me_result in self.fetch(query.first, binding=binding, conditional=conditional):
-                for them_result in self._fetch_and(query.rest, binding=me_result.binding, conditional=conditional):
+                for them_result in self.fetch(query.rest, binding=me_result.binding, conditional=conditional):
+                    if them_result.binding != language.NO:
 
-                    # TODO more satisfactory recombination of conditions than And
-                    yield t.FetchResult(them_result.binding, language.And([them_result.condition, me_result.condition]))
+                        # TODO figure out how to fail on contradictory conditions
+                        yield t.FetchResult(them_result.binding, language.And([them_result.condition,
+                                                                               me_result.condition]))
 
     def tell(self, rule: typing.Union[language.Rule, language.Logical]) -> None:
         if isinstance(rule, language.And):

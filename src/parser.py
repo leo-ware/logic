@@ -52,13 +52,23 @@ class PrologTransformer(Transformer):
         return language.CUT
 
     def true(self, _):
-        return language.TRUE
+        return language.YES
 
     def false(self, _):
-        return language.FAIL
+        return language.NO
 
     def fail(self, _):
-        return language.FAIL
+        return language.NO
+
+    # literals
+    def number(self, tree):
+        try:
+            return int(tree[0])
+        except ValueError:
+            return float(tree[0])
+
+    def string(self, tree):
+        return str(tree[0])[1:-1]  # removes quotes
 
 
 def prolog(pg: typing.Union[str, typing.IO]):

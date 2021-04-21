@@ -40,8 +40,8 @@ arity: /[0-9]+/
     | disj
     | conj
     | list                // ↓ aliases ↓
-//    | SIGNED_NUMBER         -> number
-//    | ESCAPED_STRING        -> string     // add these back when there is parser handling
+    | SIGNED_NUMBER         -> number
+    | ESCAPED_STRING        -> string
 
 neg:
     | "\+" term
