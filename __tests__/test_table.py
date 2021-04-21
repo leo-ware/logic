@@ -35,3 +35,25 @@ def test_predicate_index():
     assert len(bar.predicates) == 1
     bar.tell(father(Leo, Henry) <= language.TRUE)
     assert len(bar.predicates) == 2
+
+
+def test_heuristic_index():
+    baz = HeuristicIndex(foo)
+    assert tuple(baz.rules()) in [((sibling(Leo, Milo) <= language.TRUE,
+                                    sibling(Leo, Anything) <= sibling(Declan, Anything))),
+                                  ((sibling(Leo, Anything) <= sibling(Declan, Anything)),
+                                   sibling(Leo, Milo) <= language.TRUE)]
+    assert len(list(baz.fetch(sibling(Leo, Milo)))) == 1
+    assert list(baz.fetch(sibling(Leo, Milo)))[0].binding == {}
+    assert list(baz.fetch(sibling(Leo, Milo)))[0].condition == language.TRUE
+
+
+def test_trie_table():
+    trie = TrieTable(foo.rules())
+    assert tuple(trie.rules()) in [((sibling(Leo, Milo) <= language.TRUE,
+                                    sibling(Leo, Anything) <= sibling(Declan, Anything))),
+                                  ((sibling(Leo, Anything) <= sibling(Declan, Anything)),
+                                   sibling(Leo, Milo) <= language.TRUE)]
+    assert len(list(trie.fetch(sibling(Leo, Milo)))) == 1
+    assert list(trie.fetch(sibling(Leo, Milo)))[0].binding == {}
+    assert list(trie.fetch(sibling(Leo, Milo)))[0].condition == language.TRUE
