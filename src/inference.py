@@ -1,5 +1,3 @@
-import typing
-
 from src import language, knowledgebase
 from src.unification import TYPE_BINDINGS
 
@@ -60,7 +58,7 @@ def bc_ask(kb: knowledgebase.KnowledgeBase, query: language.Logical, patience=fl
         _depth
     """
     for result in kb.fetch(query, conditional=True):
-        if result.condition in [language.TRUE, language.And([])]:
+        if result.condition in [language.YES, language.And([])]:
             if _depth >= min_depth:
                 yield dict(result.binding)
         elif patience > _depth:
@@ -70,3 +68,9 @@ def bc_ask(kb: knowledgebase.KnowledgeBase, query: language.Logical, patience=fl
                 yield dict(sub_goal_binding)
 
 
+# def id_ask(kb: knowledgebase.KnowledgeBase, query: language.Logical, patience=float("inf")) -> TYPE_BINDINGS:
+#     level = 0
+#     while level <= patience:
+#         for binding in bc_ask(kb, query, patience=level, min_depth=level):
+#             yield dict(binding)
+#         level += 1
