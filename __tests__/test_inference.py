@@ -8,7 +8,7 @@ Milo = Term("Milo")
 Declan = Term("Declan")
 Axel = Term("Axel")
 
-KB = KnowledgeBase(LinearTable(), [
+KB = LinearTable([
     sibling(Milo, Leo),
     sibling(Leo, Declan),
     sibling(X, Y) <= sibling(Y, X),
@@ -30,3 +30,12 @@ def test_bc():
     assert next(bc_ask(KB, sibling(Leo, Milo))) == {}
     with raises(RecursionError):
         next(bc_ask(KB, sibling(Axel, Leo)))
+
+
+# def test_id():
+#     assert {X: Leo} in list(id_ask(KB, sibling(X, Milo)))
+#     assert {X: Declan} in list(id_ask(KB, sibling(X, Milo)))
+#     assert list(id_ask(KB, sibling(Leo, Milo))) == [{}]
+#     assert list(id_ask(KB, sibling(Declan, Milo))) == [{}]
+#     assert list(id_ask(KB, sibling(Axel, Leo))) == []
+#     assert list(id_ask(KB, sibling(Axel, X))) == []

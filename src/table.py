@@ -2,28 +2,23 @@ import abc
 import functools
 import itertools
 import typing
-from collections import namedtuple, defaultdict
+from collections import defaultdict
 
 from src import language, unification
-from src.unification import TYPE_BINDING
 
 
 TYPE_RULES = typing.Optional[typing.Iterable[language.Rule]]
-
-FetchResult = namedtuple("FetchResult", ["binding", "condition"])
 
 
 class AbstractTable(abc.ABC):
 
     @abc.abstractmethod
-    def fetch(self, query: language.Term, conditional: bool = False, binding: typing.Optional[TYPE_BINDING] = None)\
-            -> typing.Iterator[FetchResult]:
+    def fetch(self, query: language.Term, conditional: bool = True) -> typing.Iterator[language.Rule]:
         """returns all rules which unify with the query
 
         Arguments:
             query: attempt to unify with this
             conditional: whether to return results which are only conditionally true, default False
-            binding: only return matches subject to this constraint
 
         Returns:
             an iterable of named tuples carrying a "binding" and a "condition"
@@ -31,7 +26,7 @@ class AbstractTable(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def tell(self, rule: language.Rule) -> None:
+    def tell(self, rule: typing.Union[language.Term, language.Rule]) -> None:
         """Adds the rule to the table"""
         pass
 
@@ -48,86 +43,65 @@ class LinearTable(AbstractTable):
         for rule in rules:
             self.tell(rule)
 
-    def tell(self, rule: language.Rule) -> None:
+    def tell(self, rule: typing.Union[language.Term, language.Rule]) -> None:
+        if isinstance(rule, language.Term):
+            rule = language.Rule(rule, language.YES)
         self._rules.append(language.standardize(rule))
 
     def rules(self) -> typing.Iterable[language.Rule]:
         return tuple(self._rules)
 
-    def fetch(self, query: language.Term, conditional: bool = False, binding: typing.Optional[TYPE_BINDING] = None)\
-            -> typing.Iterator[FetchResult]:
+    def fetch(self, query: language.Term, conditional: bool = True) -> typing.Iterator[language.Rule]:
         for rule in self.rules():
-            rule_binding = unification.unify(rule.head, query, binding or {})
-            if (rule_binding != language.NO) and ((rule.body is language.YES) or conditional):
-                rule_binding.update(binding)  # pass on irrelevant constraints
-                yield FetchResult(rule_binding, language.substitute(rule.body, rule_binding))
+            if (unification.unify(rule.head, query) != language.NO) and\
+                    ((rule.body == language.YES) or conditional):
+                yield rule
 
 
 class TrieTable(AbstractTable):
     """Table implementing a trie-inspired search strategy"""
     def __init__(self, rules: TYPE_RULES = ()):
-        self.conditional: typing.List[language.Logical] = []
-        self.unconditional: bool = False
+        self._rules: typing.List[language.Rule] = []
         self.trie: typing.Dict[str, TrieTable] = defaultdict(TrieTable)
 
         for rule in rules:
             self.tell(rule)
 
-    def tell_destructured(self, head: tuple, body: language.Logical):
+    def tell_destructured(self, head: tuple, rule: language.Rule):
         if head:
-            self.trie[head[0]].tell_destructured(head[1:], body)
-        elif body == language.YES:
-            self.unconditional = True
+            self.trie[head[0]].tell_destructured(head[1:], rule)
         else:
-            self.conditional.append(body)
+            self._rules.append(rule)
 
-    def tell(self, rule: language.Rule):
+    def tell(self, rule: typing.Union[language.Term, language.Rule]) -> None:
+        if isinstance(rule, language.Term):
+            rule = language.Rule(rule, language.YES)
         rule = language.standardize(rule)
-        self.tell_destructured((rule.head.op, *rule.head.args), rule.body)
-
-    def conditions(self, conditional: bool):
-        if self.unconditional:
-            yield language.YES
-        if conditional:
-            for condition in self.conditional:
-                yield condition
+        self.tell_destructured((rule.head.op, *rule.head.args), rule)
 
     # noinspection PyStatementEffect
-    def _fetch(self, query: tuple, conditional: bool, binding: TYPE_BINDING) -> typing.Iterator[FetchResult]:
+    def _fetch(self, query: tuple, conditional: bool) -> typing.Iterator[language.Rule]:
         if query:
             if not isinstance(query[0], language.Variable):
                 self.trie[query[0]]  # creates sub-trie
             for key in self.trie:
-                this_binding = unification.unify(query[0], key, binding)
+                this_binding = unification.unify(query[0], key)
                 if this_binding != language.NO:
-                    for result in self.trie[key]._fetch(query[1:], conditional, this_binding):
+                    for result in self.trie[key]._fetch(query[1:], conditional):
                         yield result
         else:
-            for c in self.conditions(conditional):
-                yield FetchResult(dict(binding), c)
+            for rule in self._rules:
+                yield rule
 
-    def fetch(self, query: language.Term, conditional: bool = False, binding: typing.Optional[TYPE_BINDING] = None) \
-            -> typing.Iterator[FetchResult]:
-        return self._fetch((query.op, *query.args), conditional, binding or {})
+    def fetch(self, query: language.Term, conditional: bool = True) -> typing.Iterator[language.Rule]:
+        return self._fetch((query.op, *query.args), conditional)
 
-    def rules(self, _op=None, _args=()):
+    def rules(self):
+        for rule in self._rules:
+            yield rule
 
-        # base cases
-        term = language.Term(_op, _args)
-        if self.unconditional:
-            yield language.Rule(term, language.YES)
-
-        for condition in self.conditional:
-            yield language.Rule(term, condition)
-
-        # recursive calls
-        for name, child in self.trie.items():
-            if _op is None:
-                kid_op, kid_args = name, ()
-            else:
-                kid_op, kid_args = _op, (*_args, name)
-
-            for rule in child.rules(kid_op, kid_args):
+        for trie in self.trie.values():
+            for rule in trie.rules():
                 yield rule
 
 
@@ -138,7 +112,7 @@ class HeuristicIndex(AbstractTable):
         table: a table to wrap
     """
     def __init__(self, table: AbstractTable):
-        self.table = table
+        self.table: AbstractTable = table
 
     @functools.lru_cache(maxsize=2000)
     def score(self, condition: language.Logical):  # lower is faster
@@ -153,15 +127,16 @@ class HeuristicIndex(AbstractTable):
         else:
             return float("inf")
 
-    def tell(self, rule: language.Rule) -> None:
+    def tell(self, rule: typing.Union[language.Term, language.Rule]) -> None:
+        if isinstance(rule, language.Term):
+            rule = language.Rule(rule, language.YES)
         self.table.tell(rule)
 
-    def fetch(self, query: language.Term, conditional: bool = False, binding: typing.Optional[TYPE_BINDING] = None) ->\
-            typing.Iterator[FetchResult]:
+    def fetch(self, query: language.Term, conditional: bool = True) -> typing.Iterator[language.Rule]:
         if not conditional:
-            return self.table.fetch(query, conditional, binding)
-        results = list(self.table.fetch(query, conditional=conditional, binding=binding))
-        return iter(sorted(results, key=lambda r: self.score(r.condition)))
+            return self.table.fetch(query, conditional)
+        results = list(self.table.fetch(query, conditional=conditional))
+        return iter(sorted(results, key=lambda r: self.score(r.body)))
 
     def rules(self) -> typing.Iterable[language.Rule]:
         return self.table.rules()
@@ -182,11 +157,12 @@ class PredicateIndex(AbstractTable):
     def rules(self) -> typing.Iterable[language.Rule]:
         return itertools.chain(*(t.rules() for t in self.predicates.values()))
 
-    def tell(self, rule: language.Rule) -> None:
+    def tell(self, rule: typing.Union[language.Term, language.Rule]) -> None:
+        if isinstance(rule, language.Term):
+            rule = language.Rule(rule, language.YES)
         if rule.op not in self.predicates:
             self.predicates[rule.op] = self.factory()
         self.predicates[rule.op].tell(rule)
 
-    def fetch(self, query: language.Term, conditional: bool = False, binding: typing.Optional[TYPE_BINDING] = None)\
-            -> typing.Iterator[FetchResult]:
-        return self.predicates[query.op].fetch(query, conditional=conditional, binding=binding)
+    def fetch(self, query: language.Term, conditional: bool = True) -> typing.Iterator[language.Rule]:
+        return self.predicates[query.op].fetch(query, conditional=conditional)

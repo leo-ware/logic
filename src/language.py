@@ -65,26 +65,9 @@ class Logical(abc.ABC):
         pass
 
 
-@dataclass(frozen=True)
-class Keyword(Logical):
-    name: str
-
-    def __repr__(self):
-        return self.name
-
-    def map(self, func):
-        return func(self)
-
-
-CUT = Keyword("CUT")
-FREE = Keyword("FREE")
-NO = Keyword("FAIL")
-YES = Keyword("TRUE")
-
-
 class Join(Logical, abc.ABC):
     SYM = "JOIN"
-    ignore = object()  # anonymous placeholder object
+    EMPTY = "JOIN"
 
     def __init__(self, args: typing.Iterable):
         self.args = self._merge(args)
@@ -94,8 +77,6 @@ class Join(Logical, abc.ABC):
         for item in args:
             if isinstance(item, self.__class__):
                 new.extend(item.args)
-            elif item is self.__class__.ignore:
-                pass
             else:
                 new.append(item)
         return tuple(new)
@@ -127,12 +108,6 @@ class Join(Logical, abc.ABC):
         return iter(self.args)
 
     def __eq__(self, other):
-        # TODO possibly better solution to redefine YES and NO as empty conjunct and disjunct
-        if not self.args and type(self) == And and other == YES:
-            return True
-        if not self.args and type(self) == Or and other == NO:
-            return True
-
         return (type(self) == type(other)) and (self.args == other.args)
 
     def __repr__(self):
@@ -141,17 +116,36 @@ class Join(Logical, abc.ABC):
         elif self:
             return f"<And {self.first}>"
         else:
-            return f"<empty {self.__class__.__name__}>"
+            return self.__class__.EMPTY
 
 
 class And(Join):
     SYM = "&"
-    ignore = YES
+    EMPTY = "YES"
 
 
 class Or(Join):
     SYM = "|"
-    ignore = NO
+    EMPTY = "NO"
+
+
+YES = And([])
+NO = Or([])
+
+
+@dataclass(frozen=True)
+class Keyword(Logical):
+    name: str
+
+    def __repr__(self):
+        return self.name
+
+    def map(self, func):
+        return func(self)
+
+
+CUT = Keyword("CUT")
+FREE = Keyword("FREE")
 
 
 @dataclass(frozen=True)

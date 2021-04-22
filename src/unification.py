@@ -7,7 +7,7 @@ import typing
 TYPE_BINDING = typing.Union[typing.Mapping[language.Variable, typing.Any], bidict, language.Keyword]
 TYPE_BINDING_OPTIONAL = typing.Optional[typing.Union[typing.Mapping[language.Variable, typing.Any], bidict,
                                                      language.Keyword]]
-TYPE_BINDINGS = typing.Iterable[typing.Union[typing.Mapping[language.Variable, typing.Any], bidict, language.Keyword]]
+TYPE_BINDINGS = typing.Iterator[typing.Union[typing.Mapping[language.Variable, typing.Any], bidict, language.Keyword]]
 
 
 def value(var, binding):

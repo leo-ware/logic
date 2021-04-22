@@ -2,7 +2,7 @@ from pathlib import Path
 from lark import Lark, Transformer
 import typing
 
-from src import language, table, knowledgebase
+from src import language
 
 # get the right file regardless of working directory
 filename = Path(__file__).parent / "prolog.lark"
@@ -18,7 +18,7 @@ class PrologTransformer(Transformer):
         return tree[0]
 
     def program(self, tree):
-        return knowledgebase.KnowledgeBase(table.LinearTable(), tree)
+        return tree
 
     def var(self, tree):
         return language.Variable(str(tree[0]))
