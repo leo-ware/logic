@@ -1,7 +1,7 @@
 from src import *
-from pytest import raises
 
 sibling = functor("sibling", 2)
+friend = functor("friend", 2)
 X, Y, Z = variables("XYZ")
 Leo = Term("Leo")
 Milo = Term("Milo")
@@ -13,6 +13,13 @@ KB = LinearTable([
     sibling(Leo, Declan),
     sibling(X, Y) <= sibling(Y, X),
     sibling(X, Y) <= sibling(X, Z) & sibling(Z, Y),
+    friend(X, Y) <= friend(X, Z) & sibling(Y, Z),
+])
+
+obvious_reality = Term("obvious reality")
+trap = LinearTable([
+    obvious_reality <= obvious_reality,
+    obvious_reality
 ])
 
 
@@ -27,12 +34,10 @@ def test_fc():
 
 def test_bc():
     assert next(bc_ask(KB, sibling(Leo, Milo))) == {}
+    assert {X: Leo, Y: Milo} in take(10, bc_ask(KB, sibling(X, Y)))
 
 
-# def test_id():
-#     assert {X: Leo} in list(id_ask(KB, sibling(X, Milo)))
-#     assert {X: Declan} in list(id_ask(KB, sibling(X, Milo)))
-#     assert list(id_ask(KB, sibling(Leo, Milo))) == [{}]
-#     assert list(id_ask(KB, sibling(Declan, Milo))) == [{}]
-#     assert list(id_ask(KB, sibling(Axel, Leo))) == []
-#     assert list(id_ask(KB, sibling(Axel, X))) == []
+def test_id():
+    assert next(id_ask(KB, sibling(Leo, Milo))) == {}
+    assert {X: Leo, Y: Milo} in take(10, id_ask(KB, sibling(X, Y)))
+    assert next(id_ask(trap, obvious_reality)) == {}
