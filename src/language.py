@@ -14,7 +14,9 @@ def variables_in(x: "Logical"):
             vs.add(thing)
         return thing
 
-    x.map(_report_variables_in)
+    if isinstance(x, Logical):
+        x.map(_report_variables_in)
+
     return vs
 
 

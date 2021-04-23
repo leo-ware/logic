@@ -35,6 +35,9 @@ class AbstractTable(abc.ABC):
         """An iterable over the rules in the table"""
         pass
 
+    def facts(self):
+        return (rule.head for rule in self.rules() if rule.body == language.YES)
+
 
 class LinearTable(AbstractTable):
     """A table where complexity is linear"""

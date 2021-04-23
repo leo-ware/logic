@@ -23,18 +23,12 @@ def value(var, binding):
         return binding[var]
 
 
-# TODO fix occur check
-def occur_check(var: language.Variable, val: Union[tuple, language.Logical]) -> bool:
-    """whether var occurs in val, because if so we can't unify"""
-    return False  # fix later
-
-
 def unify_variable(var: language.Variable, val: Any, binding: TYPE_BINDING) -> TYPE_BINDING:
     if var in binding:
         return unify(binding[var], val, binding)
     elif val in binding.inverse:
         return unify(var, binding.inverse[val], binding)
-    elif occur_check(var, val):
+    elif var in language.variables_in(val):  # occur check
         return language.NO
     else:
         binding[var] = val
@@ -42,8 +36,7 @@ def unify_variable(var: language.Variable, val: Any, binding: TYPE_BINDING) -> T
 
 
 def unify_term(x: language.Term, y: language.Term, binding: TYPE_BINDING) -> TYPE_BINDING:
-    """
-    Unifies two compounds, optionally subject to a binding, returning a binding
+    """Unifies two compounds, optionally subject to a binding, returning a binding
     """
     if not len(x.args) == len(y.args):
         return language.NO
@@ -53,8 +46,7 @@ def unify_term(x: language.Term, y: language.Term, binding: TYPE_BINDING) -> TYP
 
 # TODO fix tail unification
 def tail(item: tuple) -> bool:
-    """
-    Figures out whether the tuple is length 1 and ends in a tail variable
+    """Figures out whether the tuple is length 1 and ends in a tail variable
     """
     try:
         return isinstance(item[0], language.Tail) and (len(item) == 1)
@@ -105,3 +97,7 @@ def unify(x: Any, y: Any, binding: TYPE_BINDING_OPTIONAL = None) -> TYPE_BINDING
         return unify_tuple(x, y, binding)
     else:
         return language.NO
+
+
+def unifiable(x, y, binding=None):
+    return unify(x, y, binding) != language.NO

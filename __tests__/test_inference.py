@@ -26,10 +26,7 @@ def test_fc():
 
 
 def test_bc():
-    assert {X: Leo} == next(bc_ask(KB, sibling(X, Milo)))
     assert next(bc_ask(KB, sibling(Leo, Milo))) == {}
-    with raises(RecursionError):
-        next(bc_ask(KB, sibling(Axel, Leo)))
 
 
 # def test_id():
