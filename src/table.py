@@ -168,4 +168,7 @@ class PredicateIndex(AbstractTable):
         self.predicates[rule.op].tell(rule)
 
     def fetch(self, query: language.Term, conditional: bool = True) -> typing.Iterator[language.Rule]:
-        return self.predicates[query.op].fetch(query, conditional=conditional)
+        try:
+            return self.predicates[query.op].fetch(query, conditional=conditional)
+        except KeyError:
+            return iter([])
